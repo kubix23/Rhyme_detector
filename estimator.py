@@ -4,14 +4,14 @@ import pyphen
 dic = pyphen.Pyphen(lang='pl_PL')
 
 def simple_estimate(text):
-    def count(word1: str, word2: str):
-        length = 0
+    def rhyme_find(word1: str, word2: str):
+        rhyme = ''
         for a, b in zip(word1[::-1], word2[::-1]):
             if a == b:
-                length += 1
+                rhyme += a
             else:
                 break
-        return length
+        return rhyme
 
     def simple_score(word1: str, word2: str):
         score = 0
@@ -27,8 +27,30 @@ def simple_estimate(text):
 
     def make_simple_score(words):
         pary = batched(permutations(words, 2),len(words)-1)
-        scores_list = [[[a, b, count(a, b), simple_score(a, b)] for a, b in g] for g in pary]
-        return [(scores[0][0], [data[1:] for data in scores if data[2] > 1]) for scores in scores_list]
+
+        scores_list = \
+        [
+            [
+                (
+                    a,
+                    {
+                        "word": b,
+                        "count": len(rhyme_find(a, b)),
+                        "rhyme": rhyme_find(a, b),
+                        "score": simple_score(a, b),
+                    }
+                )
+                for a, b in g
+            ]
+            for g in pary
+        ]
+        return [
+            {
+                "word": scores[0][0],
+                "matches": [ data[1] for data in scores if data[1]["count"] > 1]
+            }
+            for scores in scores_list
+        ]
 
     words = [i.split() for i in text.splitlines() if i]
     words_line_len = [len(i.split()) for i in text.splitlines() if i]
@@ -37,27 +59,41 @@ def simple_estimate(text):
     return [words_score[words_line_num[i]:words_line_num[i+1]] for i in range(len(words))]
 
 def score(text):
-    return [[sum([i[2] for i in group]) for key,group in inn] for inn in simple_estimate(text)]
+    return [
+        [
+            sum([i["score"] for i in word["matches"]])
+            for word in line
+        ]
+    for line in simple_estimate(text)
+    ]
 
 def rhymes_scheme(text):
     def rhyme_list(scores):
         letter = 'a'
         rhymes = {}
         for score in scores:
-            for _, group in score:
-                for i in group:
-                    if i[2] != 0:
-                        rhyme = i[0][-i[1]:]
+            for words in score:
+                for i in words["matches"]:
+                    if i["score"] != 0:
+                        rhyme = i["rhyme"]
                         if rhyme not in rhymes:
-                            rhymes[rhyme] = letter
-                            letter = chr(ord(letter) + 1)
+                            rhymes[rhyme] = chr(ord(list(rhymes.values())[-1])+1) if rhymes else 'a'
 
         return rhymes
 
-    scores =  list(simple_estimate(text))
+    scores =  simple_estimate(text)
     rhymes = rhyme_list(scores)
-    scheme = [[[''.join(list(set([rhymes[i[0][-i[1]:]] if i[2] > 0 else '-' for i in group]))).strip()] if group else ['-'] for k,group in score] for score in scores]
-    scheme_string = f'\n'.join(['{0:3}.\t'.format(num+1) +'|'.join(sum(i,[])) for num,i in enumerate(scheme)])
+    scheme = \
+    [
+        [
+            ''.join(list(set([rhymes[match["rhyme"]] for match in word["matches"] if match["score"] > 0])))
+            for word in line
+        ]
+        for line in scores
+    ]
+    scheme = [[j if j else '-' for j in i] for i in scheme]
+
+    scheme_string = f'\n'.join(['{0:3}.\t'.format(num+1) +'|'.join(line) for num,line in enumerate(scheme)])
 
     print(rhymes)
     print(scheme_string)
