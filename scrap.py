@@ -39,10 +39,10 @@ for item in tqdm(data[:number]):
         path = os.path.join(OUT, filename)
 
         txt2 = txt.split("-----")[0].split("\r\n\r\n\r\n\r\n",1)[1]
-        txt3 = '\n'.join([re.sub(r'[^\w\s]', '', i.strip())  for i in txt2.splitlines()])
+        txt3 = '\n'.join([re.sub(r'[^\w\s]', '', i.lower().strip())  for i in txt2.splitlines()])
 
         with open(path, "w", encoding="utf-8") as f:
-            f.write(txt3.lower())
+            f.write(txt3)
 
         poems.append(path)
 

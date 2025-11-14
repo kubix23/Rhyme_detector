@@ -1,4 +1,4 @@
-from itertools import combinations, groupby, batched, permutations, accumulate
+from itertools import groupby, permutations, accumulate, batched
 import pyphen
 
 dic = pyphen.Pyphen(lang='pl_PL')
@@ -33,7 +33,7 @@ def simple_estimate(text: str):
     def make_simple_score(words):
         return [
             {
-                "word": key,
+                "word": group[0][0]["word"],
                 "matches": [
                     {
                         "word": word_target["word"],
@@ -63,7 +63,7 @@ def simple_estimate(text: str):
                        )
                 ]
             }
-            for key,group in groupby(permutations(words, 2), lambda x: x[0]["word"])
+            for group in  batched(permutations(words, 2), len(words)-1)
         ]
 
     words = [

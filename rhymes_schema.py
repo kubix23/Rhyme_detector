@@ -1,49 +1,54 @@
-from itertools import groupby
-from operator import itemgetter
-from pprint import pprint
 from typing import Callable
+import networkx as nx
 
 def rhymes_scheme(text, estimate_func: Callable):
-    def rhyme_list(scores):
-        rhymes_symbol = {}
-        for score in scores:
-            for words in score:
-                for matche in words["matches"]:
-                    if matche["score"] != 0:
-                        rhyme = matche["rhyme_target"]
-                        if rhyme not in rhymes_symbol:
-                            if "rhyme_source" in matche and matche["rhyme_source"] in rhymes_symbol:
-                                rhymes_symbol[rhyme] = rhymes_symbol[matche["rhyme_source"]]
-                            else:
-                                rhymes_symbol[rhyme] = chr(ord(list(rhymes_symbol.values())[-1]) + 1) if rhymes_symbol else 'a'
-
-        return rhymes_symbol
+    letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
     scores = estimate_func(text)
-    rhymes_symbol = rhyme_list(scores)
-    scheme = \
-    [
+    rhyme_list = {
+        (matche["rhyme_target"], matche["rhyme_source"] if "rhyme_source" in matche else matche["rhyme_target"])
+        for score in scores
+        for word in score
+        for matche in word["matches"]
+        if matche["score"] != 0
+    }
+
+    G = nx.Graph()
+    G.add_edges_from(rhyme_list)
+    cliques = nx.find_cliques(G)
+
+    rhymes_symbol =  [
+        {
+            "rhyme":group,
+            "letter": letters[i],
+        }
+        for i, group in enumerate(cliques)
+    ]
+
+    scheme = [
         [
             temp
             if (temp := ''.join(
-                list(set(
-                    [
-                        rhymes_symbol[match["rhyme_target"]]
-                        for match in word["matches"]
-                        if match["score"] > 0
-                    ]
-                ))
+                {
+                    rhyme["letter"]
+                    for match in word["matches"]
+                    for rhyme in rhymes_symbol
+                    if (
+                        match["rhyme_target"] in rhyme["rhyme"]
+                        and ("rhyme_source" not in match or match["rhyme_source"] in rhyme["rhyme"])
+                    )
+                }
             ))
             else '-'
             for word in line
         ]
         for line in scores
     ]
-    printable_rhymes_symbol = {
-        key: x[0] if len(x := [i[0] for i in group]) == 1 else x
-        for key,group in groupby(sorted(rhymes_symbol.items(), key= lambda rhyme: rhyme[1]), lambda rhyme: rhyme[1])
-    }
+    printable_rhymes_symbol = {cell["letter"]:cell["rhyme"] for cell in rhymes_symbol}
     scheme_string = f'\n'.join(['{0:3}.\t'.format(num+1) +'|'.join(line) for num,line in enumerate(scheme)])
 
-    pprint(printable_rhymes_symbol)
-    print(scheme_string)
+    return {
+        "printable_rhymes_symbol":printable_rhymes_symbol,
+        "scheme": scheme,
+        "scheme_string":scheme_string,
+    }

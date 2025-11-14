@@ -1,5 +1,5 @@
 import sys
-from itertools import combinations, groupby, batched, permutations, accumulate
+from itertools import groupby, permutations, accumulate, batched
 
 import pyphen
 import epitran
@@ -39,7 +39,8 @@ def advanced_estimate(text: str, threshold = 0):
         mul = pronunciation_distance(rhyme["rhyme_source"], rhyme["rhyme_target"])/(threshold + sys.float_info.epsilon)
         if word_source["word"] != word_target["word"]:
             score = 10 - 10*mul
-        elif len(word_source["word"]) > 1 or word_source["word_num"] == 0:
+        elif (len(word_source["word"]) > 1
+              or (word_source["word_num"] == 0 and word_target["word_num"] == 0)):
             score = 1
         else:
             score = 0
@@ -48,12 +49,14 @@ def advanced_estimate(text: str, threshold = 0):
     def make_advanced_score(words):
         return [
             {
-                "word": key,
+                "word": group[0][0]["word"],
                 "matches": [
                     {
                         "word": word_target["word"],
                         "rhyme_source": rhyme["rhyme_source"],
                         "rhyme_target": rhyme["rhyme_target"],
+                        "distance_word": pronunciation_distance(word_source["word"], word_target["word"]),
+                        "distance_rhyme": pronunciation_distance(rhyme["rhyme_source"], rhyme["rhyme_target"]),
                         "score": advanced_score(rhyme, word_source, word_target),
                     }
                     for word_source, word_target in group
@@ -82,7 +85,7 @@ def advanced_estimate(text: str, threshold = 0):
                        )
                 ]
             }
-            for key,group in groupby(permutations(words, 2), lambda x: x[0]["word"])
+            for group in batched(permutations(words, 2), len(words)-1)
         ]
 
     words = [
